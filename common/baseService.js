@@ -14,6 +14,7 @@ export class BaseService {
             logger.info("registing endpoints for ", inst.constructor.name)
             await inst.regEndpoints(gl.app)
         }
+        gl[inst.constructor.name.toLowerCase()] = inst
         return inst
     }
 }
