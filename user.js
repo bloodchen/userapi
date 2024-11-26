@@ -10,7 +10,7 @@ export class User extends BaseService {
             this.pname = progress.env.pname || 'userapi'
             this.db = this.client.db(this.pname);
         } catch (e) {
-            console.error("MongoClient", e.message)
+            console.error("MongoClient error:", e.message)
         }
     }
     async signup({ email, password }) {
