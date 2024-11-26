@@ -1,5 +1,5 @@
-source .env
-NAME="rest_template"
+source env
+NAME="userapi"
 PORT="${dockerPort:=8100}"
 
 docker build -t $NAME .

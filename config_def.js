@@ -1,5 +1,5 @@
 export const Config = {
     project: {
-        name: "uugpt"
+        name: "userapi"
     }
 }
