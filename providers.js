@@ -5,8 +5,8 @@ export class Providers extends BaseService {
     async init(gl) {
         const { config } = gl
         this.googleOauth = new google.auth.OAuth2(
-            config.providers.google.cid,
-            config.providers.google.secret,
+            process.env.google_cid,
+            process.env.google_secret,
             'http://localhost:8083/callback/google'
         );
         this.googleUrl = this.googleOauth.generateAuthUrl({
