@@ -46,6 +46,7 @@ export class User extends BaseService {
         }
         const { uid } = await util.decodeToken({ token })
         if (!uid) console.error("decode token error")
+        console.log("got UID:", uid)
         return uid
     }
 
