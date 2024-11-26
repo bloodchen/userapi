@@ -4,7 +4,7 @@ ENV NODE_ENV production
 ADD package.json /tmp/package.json
 RUN npm install 
 
-FROM node:16-alpine
+FROM node:20-alpine
 ENV NODE_ENV production
 RUN npm install pm2 -g
 WORKDIR /home/node/app/
