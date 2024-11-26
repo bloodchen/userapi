@@ -7,7 +7,7 @@ export class User extends BaseService {
             const client = new MongoClient(process.env.mongo);
             const res = await client.connect()
             this.client = client
-            this.pname = progress.env.pname || 'userapi'
+            this.pname = process.env.pname || 'userapi'
             this.db = this.client.db(this.pname);
         } catch (e) {
             console.error("MongoClient error:", e.message)
