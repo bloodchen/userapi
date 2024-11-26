@@ -7,7 +7,7 @@ export class User extends BaseService {
             const client = new MongoClient(process.env.mongo);
             const res = await client.connect()
             this.client = client
-            this.pname = gl.config.project.name || 'userapi'
+            this.pname = progress.env.pname || 'userapi'
             this.db = this.client.db(this.pname);
         } catch (e) {
             console.error("MongoClient", e.message)
@@ -58,7 +58,7 @@ export class User extends BaseService {
                 if (uid)
                     return { code: 100, msg: "already logged in" }
             }
-            const { email, password } = req.query
+            const { email, password } = req.query || {}
             const { uid } = await this.signup({ email, password })
             token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
