@@ -1,4 +1,4 @@
-source env
+source ./env
 NAME="userapi"
 PORT="${dockerPort:=8100}"
 
