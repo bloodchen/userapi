@@ -28,7 +28,7 @@ export class User extends BaseService {
         const docCol = this.db.collection('users');
         uid = +uid
         const result = uid ? await docCol.findOne({ uid }) : await docCol.findOne({ email })
-        delete result._id
+        if (result) delete result._id
         return result
     }
     async updateUser({ uid, info }) {
