@@ -13,7 +13,8 @@ export class User extends BaseService {
             console.error("MongoClient error:", e.message)
         }
     }
-    async signup({ email, password }) {
+    async signup({ email, password, sip }) {
+        const { util } = this.gl
         const docCol = this.db.collection('users');
         const uid = Math.floor(Date.now() / 1000)
         let i = 0
@@ -21,7 +22,7 @@ export class User extends BaseService {
             uid++
         }
         if (i >= 1000) return { code: 1, err: "uid exceed" }
-        const result = await docCol.insertOne({ uid, email, password })
+        const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip) })
         return { code: 0, uid }
     }
     async getUser({ uid, email }) {
@@ -59,8 +60,10 @@ export class User extends BaseService {
                 if (uid)
                     return { code: 100, msg: "already logged in" }
             }
+            const sip = util.getClientIp(req)
+
             const { email, password } = req.query || {}
-            const { uid } = await this.signup({ email, password })
+            const { uid } = await this.signup({ email, password, ip })
             token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
             return { code: 0, uid }

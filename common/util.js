@@ -62,5 +62,19 @@ export class Util extends BaseService {
         }
         return {}
     }
-    
+    getClientIp(req) {
+        let IP =
+            //req.ip ||
+            req.headers['CF-Connecting-IP'] ||
+            req.headers["x-forwarded-for"] ||
+            req.socket.remoteAddress ||
+            req.connection.remoteAddress ||
+            req.connection.socket.remoteAddress;
+        IP = IP.split(',')[0]
+        //IP = IP.split(":").pop()
+        return IP;
+    }
+    ipv4ToInt(ip) {
+        return ip.split('.').reduce((int, part) => (int << 8) + parseInt(part, 10), 0);
+    }
 }
