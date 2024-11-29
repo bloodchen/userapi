@@ -92,5 +92,20 @@ export class User extends BaseService {
             const result = await this.updateUser({ uid, info })
             return result
         })
+        app.get('/exist', async (req, res) => {
+            const { email } = req.query
+            const result = await this.getUser({ email })
+            return { code: 0, exist: !!result }
+        })
+        app.get('/login', async (req) => {
+            const { email, password } = req.query
+            const result = await this.getUser({ email })
+            if (!result) return { code: 100, msg: "user not exist" }
+            if (result.password != password) return { code: 100, msg: "password error" }
+            const { util } = this.gl
+            const token = await util.uidToToken({ uid: result.uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
+            util.setCookie({ res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
+            return { code: 0, uid: result.uid }
+        })
     }
 }
