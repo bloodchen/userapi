@@ -4,10 +4,11 @@ import { MongoClient } from 'mongodb';
 export class User extends BaseService {
     async init(gl) {
         try {
+            const { config } = gl
             const client = new MongoClient(process.env.mongo);
             const res = await client.connect()
             this.client = client
-            this.pname = process.env.pname || 'userapi'
+            this.pname = config.project.name || 'userapi'
             this.db = this.client.db(this.pname);
         } catch (e) {
             console.error("MongoClient error:", e.message)
