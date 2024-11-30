@@ -10,7 +10,7 @@ export class KVDB extends BaseService {
         delete body.k
         const docCol = this.db.collection('kv');
         const result = await docCol.updateOne({ k }, { $set: body }, { upsert: true })
-        return body
+        return { code: 0, result: body }
     }
     async inc(body) {
         const { k } = body
@@ -21,7 +21,7 @@ export class KVDB extends BaseService {
             const result = await docCol.updateOne({ k }, { $inc: body }, { upsert: true })
         } catch (e) {
             console.error(e)
-            return { code: 1, err: e.message }
+            return { code: 2, err: e.message }
         }
         const res = await this.get({ k })
         const delKey = []
@@ -31,13 +31,13 @@ export class KVDB extends BaseService {
         for (let key of delKey) {
             delete res[key]
         }
-        return res
+        return { code: 0, result: res }
     }
     async get({ k }) {
         const docCol = this.db.collection('kv');
         const result = await docCol.findOne({ k })
         if (result) delete result._id
-        return result
+        return { code: 0, result }
     }
     async regEndpoints(app) {
         app.post('/kv/set', async (req) => {
