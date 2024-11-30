@@ -23,15 +23,16 @@ export class KVDB extends BaseService {
             console.error(e)
             return { code: 2, err: e.message }
         }
-        const res = await this.get({ k })
+        const { code, result } = await this.get({ k })
+        if (code != 0) return { code, err: result }
         const delKey = []
-        for (let key in res) {
+        for (let key in result) {
             if (!body[key]) delKey.push(key)
         }
         for (let key of delKey) {
-            delete res[key]
+            delete result[key]
         }
-        return { code: 0, result: res }
+        return { code: 0, result }
     }
     async get({ k }) {
         const docCol = this.db.collection('kv');
