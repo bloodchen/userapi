@@ -10,6 +10,7 @@ export class User extends BaseService {
             this.client = client
             this.pname = config.project.name || 'userapi'
             this.db = this.client.db(this.pname);
+            gl.mongo = this.client
         } catch (e) {
             console.error("MongoClient error:", e.message)
         }

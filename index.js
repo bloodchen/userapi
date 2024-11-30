@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { Config } from './config.js';
 import { User } from './user.js';
 import { Util } from './common/util.js';
+import { KVDB } from './kvdb.js';
 
 const app = fastifyModule({ logger: false });
 const gl = {}
@@ -26,6 +27,7 @@ async function main() {
     await regEndpoints()
     await User.create(gl)
     await Util.create(gl)
+    await KVDB.create(gl)
     await startServer()
     process.on('SIGINT', onExit);
     process.on('SIGTERM', onExit);
