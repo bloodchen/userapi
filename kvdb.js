@@ -4,15 +4,15 @@ export class KVDB extends BaseService {
     async init(gl) {
         this.db = gl.user.client.db("kvdb");
     }
-    async set(body) {
+    async set(body, ret = false) {
         const { k } = body
         if (!k) return { code: 1, err: "k is required" }
         delete body.k
         const docCol = this.db.collection('kv');
         const result = await docCol.updateOne({ k }, { $set: body }, { upsert: true })
-        return { code: 0, result: body }
+        return { code: 0, result: ret ? body : null }
     }
-    async inc(body) {
+    async inc(body, ret = false) {
         const { k } = body
         if (!k) return { code: 1, err: "k is required" }
         delete body.k
@@ -23,6 +23,7 @@ export class KVDB extends BaseService {
             console.error(e)
             return { code: 2, err: e.message }
         }
+        if (!ret) return { code: 0 }
         const { code, result } = await this.get({ k })
         if (code != 0) return { code, err: result }
         const delKey = []
@@ -42,10 +43,12 @@ export class KVDB extends BaseService {
     }
     async regEndpoints(app) {
         app.post('/kv/set', async (req) => {
-            return await this.set(req.body)
+            const { ret = false } = req.query
+            return await this.set(req.body, ret)
         })
         app.post('/kv/inc', async (req) => {
-            return await this.inc(req.body)
+            const { ret = false } = req.query
+            return await this.inc(req.body, ret)
         })
         app.get('/kv/get', async (req) => {
             const { k } = req.query
