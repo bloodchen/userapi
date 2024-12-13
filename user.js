@@ -99,7 +99,7 @@ export class User extends BaseService {
             const result = await this.getUser({ email })
             return { code: 0, exist: !!result }
         })
-        app.get('/login', async (req) => {
+        app.get('/login', async (req, res) => {
             const { email, password } = req.query
             const result = await this.getUser({ email })
             if (!result) return { code: 100, msg: "user not exist" }
