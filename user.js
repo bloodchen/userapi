@@ -11,6 +11,17 @@ export class User extends BaseService {
             this.pname = config.project.name || 'userapi'
             this.db = this.client.db(this.pname);
             gl.mongo = this.client
+<<<<<<< HEAD
+=======
+            if (stripeTesting) {
+                this.endSecret = process.env.stripe_sec_test//mx testing
+                stripe = Stripe(process.env.stripe_key_test)
+            } else {
+                this.endSecret = process.env.stripe_sec //maxthon
+                stripe = Stripe(process.env.stripe_key)
+            }
+            gl.stripe = stripe
+>>>>>>> 4bcac5d (update)
         } catch (e) {
             console.error("MongoClient error:", e.message)
         }
