@@ -1,6 +1,9 @@
+import Stripe from 'stripe'
 import { BaseService } from "./common/baseService.js";
 import { MongoClient } from 'mongodb';
 
+let stripe = null
+const stripeTesting = true
 export class User extends BaseService {
     async init(gl) {
         try {
@@ -19,7 +22,6 @@ export class User extends BaseService {
                 stripe = Stripe(process.env.stripe_key)
             }
             gl.stripe = stripe
-
         } catch (e) {
             console.error("MongoClient error:", e.message)
         }
@@ -32,26 +34,29 @@ export class User extends BaseService {
         while (i < 1000 && await this.getUser({ uid })) {
             uid++
         }
-        if (i >= 1000) return { code: 1, err: "uid exceed" }
+        if (i >= 1000) return { code: 1, msg: "uid exceed" }
         const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip) })
         return { code: 0, uid }
     }
-    async getUser({ uid, email }) {
+    async getUser({ uid, email, withOrder = false }) {
         const docCol = this.db.collection('users');
         uid = +uid
         const result = uid ? await docCol.findOne({ uid }) : await docCol.findOne({ email })
-        if (result) delete result._id
+        if (!result) return null
+        delete result._id
+        if (withOrder) result.order = await this.getOrder({ uid })
         return result
     }
     async updateUser({ uid, info }) {
         const docCol = this.db.collection('users');
         uid = +uid
         const result = await docCol.updateOne({ uid }, { $set: info })
-        return result
+        if (result.modifiedCount > 0 || result.upsertedCount > 0) return { code: 0, msg: "success" }
+        return { code: 1, msg: result }
     }
-    async getUID({ req }) {
+    async getUID({ req, token }) {
         const { util } = this.gl
-        let token = util.getCookie({ name: `${this.pname}_ut`, req })
+        if (!token) token = util.getCookie({ name: `${this.pname}_ut`, req })
         if (!token) {
             console.error("no token")
             return null
@@ -61,7 +66,113 @@ export class User extends BaseService {
         console.log("got UID:", uid)
         return uid
     }
+    getOrderId({ uid, product }) {
+        return uid + '-' + product
+    }
+    async getOrder({ uid, product, all = false }) {
+        const docCol = this.db.collection('orders');
+        const id = this.getOrderId({ uid, product })
+        const condition = { uid }
+        if (product) condition.product = product
+        const result = await docCol.find(condition).sort({ ctime: -1 }).toArray()
+        return all ? result : result[0]
+    }
+    async createOrder({ uid, meta }) {
+        const docCol = this.db.collection('orders');
+        const ctime = Math.floor(Date.now() / 1000)
+        const { product } = meta
+        const result = await docCol.insertOne({ id: this.getOrderId({ uid, product }), uid, product, meta, ctime })
+        return result
+    }
+    async createPaymentUrl({ uid, product, success_url, cancel_url, lang }) {
+        const { config, util } = this.gl
+        const siteUrl = process.env.siteUrl
+        if (lang === 'cn') lang = 'zh'
+        //check existing order
+        const order = await this.getOrder({ uid, product })
+        if (order && order.meta.mode === 'sub') {
+            const now = Math.floor(Date.now() / 1000)
+            if (order.meta.endTime > now) {
+                return { code: 101, msg: "order existed" }
+            }
+        }
+        /*if ((lang === 'zh') && !recurring) {
+            const oid = 'wxpay_' + Date.now().toString(31)
+            let price_cny = (price * config.rates['USD/CNY'] / 100).toFixed(2)
+            await redis.set(oid, JSON.stringify(metadata), 'ex', 60 * 60 * 24) //expire in 24 hours
+            console.log("created wx pay:", oid)
+            return { code: 0, url: siteUrl + `/static/wxpay.html?price=${price_cny}&oid=${oid}&product=${product}` }
+        }*/
+        if (!success_url) success_url = siteUrl + "/pay_success"
+        if (!cancel_url) cancel_url = siteUrl + "/pay_cancel" //config.topup
 
+        success_url += "?session_id={CHECKOUT_SESSION_ID}"
+
+        const { coupon, mode, price } = config.payment[product]
+        if (!price) {
+            return { code: 100, msg: "invalid product" }
+        }
+        const metadata = { uid, product, v: '1', mode }
+        const opts = {
+            line_items: [{
+                price,
+                quantity: 1,
+            }],
+            discounts: [{
+                coupon, // Use the existing coupon
+            }],
+            metadata, client_reference_id: uid,
+            mode: mode === 'sub' ? "subscription" : "payment", success_url, cancel_url, automatic_tax: { enabled: true },
+            payment_method_types: ['card', 'alipay'],
+        }
+
+        if (opts.mode === 'subscription') opts.subscription_data = { metadata }
+        if (opts.mode === 'payment') opts.payment_intent_data = { metadata }
+
+        const session = await stripe.checkout.sessions.create(opts);
+
+        return { code: 0, url: session.url }
+
+    }
+    async stripe_handleSuccess(paymentIntent) {
+        const { config } = this.gl
+        let meta = {}
+        if (paymentIntent.invoice) { //part of subsciption
+            const invoice = await stripe.invoices.retrieve(paymentIntent.invoice);
+            if (invoice) {
+                const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+                // Access the metadata
+                console.log("got subscription:", subscription)
+                meta = subscription?.metadata;
+                if (!meta) {
+                    console.error('no metadata')
+                    return { code: 1, msg: "no metadata" }
+                }
+                const { product } = meta
+                if (!config.payment[product] && !['diamond', 'gold'].includes(product)) {
+                    console.error('unknown product')
+                    return { code: 1, msg: "unknown product" }
+                }
+                meta.endTime = subscription.current_period_end;
+                meta.sub_id = subscription.id
+            }
+        } else { //onetime payment
+            meta = paymentIntent.metadata
+            if (!meta) {
+                console.error('no metadata')
+                return { code: 1, msg: "no metadata" }
+            }
+            const { product } = meta
+            if (!config.cost[product] || !['diamond', 'gold'].includes(product)) {
+                console.error('unknown product')
+                return { code: 1, msg: "unknown product" }
+            }
+        }
+        meta.pid = paymentIntent.id
+        meta.channel = 'stripe'
+        meta.customerId = paymentIntent.customer
+        return await this.createOrder({ uid: +meta.uid, meta })
+    }
     async regEndpoints(app) {
         app.get('/signup', async (req, res) => {
             const { util } = this.gl
@@ -79,6 +190,10 @@ export class User extends BaseService {
             util.setCookie({ res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
             return { code: 0, uid }
         })
+        app.get('/_uid', async (req) => {
+            const uid = await this.getUID({ req })
+            return { code: 0, uid }
+        })
         app.get('/_info', async (req, res) => {
             const { util } = this.gl
             let { uid, email } = req.query
@@ -92,7 +207,8 @@ export class User extends BaseService {
             const uid = await this.getUID({ req })
             if (!uid)
                 return { code: 101, msg: "no uid" }
-            const result = await this.getUser({ uid })
+            const { withOrder } = req.query
+            const result = await this.getUser({ uid, withOrder })
             return { code: 0, info: result }
         })
         app.post('/update', async (req) => {
@@ -117,6 +233,62 @@ export class User extends BaseService {
             const token = await util.uidToToken({ uid: result.uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
             return { code: 0, uid: result.uid }
+        })
+        app.post('/pay/createPayment', async (req, res) => {
+            const { util } = this.gl
+            const uid = 208; //await this.getUID({ req })
+            //if (!uid)return { code: 101, msg: "no uid" }
+            const { product, success_url, cancel_url, lang = 'en' } = req.body
+            return this.createPaymentUrl({ uid, product, success_url, cancel_url, lang })
+        })
+        app.get('/pay/manage-subscription', async (req, res) => {
+            const uid = await this.getUID({ req })
+            if (!uid) return { code: 101, msg: "no uid" }
+            const order = await this.getOrder({ uid })
+            if (!order) return { code: 101, msg: "no order" }
+            const customerId = order.meta.customerId; // 从用户会话中获取 Stripe Customer ID
+            try {
+                const session = await stripe.billingPortal.sessions.create({
+                    customer: customerId,
+                    return_url: 'https://your-website.com/dashboard',
+                });
+                res.redirect(session.url); // 重定向到 Customer Portal
+            } catch (error) {
+                res.status(500).send('Unable to load subscription management page');
+            }
+        })
+        app.post('/pay/callback/stripe', { config: { rawBody: true } }, async (req, res) => {
+            const { stripe } = this.gl
+            const sig = req.headers['stripe-signature'];
+            //for local cli
+            //const endpointSecret = "whsec_f4306e6f86b06692c93102051b2d0a6d93702cb866c35cc88eed1380a1e244c2";
+            //for http://api.maxthon.com
+            const endpointSecret = this.endSecret
+            let event;
+            console.log("got stripe callback body:", req.body)
+            try {
+                event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+            } catch (err) {
+                console.error(err.message)
+                res.status(400).send(`Webhook Error: ${err.message}`);
+                return;
+            }
+            console.log('stripe event:', event)
+            // Handle the event
+            switch (event.type) {
+                case 'payment_intent.succeeded':
+                    const paymentIntentSucceeded = event.data.object;
+                    console.log(paymentIntentSucceeded)
+                    this.stripe_handleSuccess(paymentIntentSucceeded)
+                    // Then define and call a function to handle the event payment_intent.succeeded
+                    break;
+                // ... handle other event types
+                default:
+                    console.log(`Unhandled event type ${event.type}`);
+            }
+
+            // Return a 200 response to acknowledge receipt of the event
+            return { code: 0 }
         })
     }
 }
