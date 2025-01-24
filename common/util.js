@@ -5,7 +5,7 @@ export class Util extends BaseService {
     async init(gl) {
         this.tokenPass = process.env.tokenPass || "2rnma5xsc3efx1Z$#%^09FYkRfuAsxTB"
     }
-    setCookie({ req, res, name, value, path = '/', secure = true, domain = 'root', days, httpOnly = false, sameSite = 'lax' }) {
+    setCookie({ req, res, name, value, path = '/', secure = true, domain = 'root', days, httpOnly = false, sameSite = 'none' }) {
         const expire = days ? days * 24 * 60 * 60 : -1
         const hostParts = (new URL("http://" + req.headers['host'])).hostname.split('.')
         const rootDomain = hostParts.slice(-2).join('.')
