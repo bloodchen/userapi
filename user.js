@@ -31,6 +31,8 @@ export class User extends BaseService {
         const docCol = this.db.collection('users');
         const uid = Math.floor(Date.now() / 1000)
         let i = 0
+        if (await this.getUser({ email })) return { code: 1, msg: "email exists" }
+
         while (i < 1000 && await this.getUser({ uid })) {
             uid++
         }
