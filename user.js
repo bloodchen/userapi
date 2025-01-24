@@ -230,7 +230,7 @@ export class User extends BaseService {
             const { email, password } = req.query
             const result = await this.getUser({ email })
             if (!result) return { code: 100, msg: "user not exist" }
-            if (result.password != password) return { code: 100, msg: "password error" }
+            if (result.password != password) return { code: 101, msg: "password error" }
             const { util } = this.gl
             const token = await util.uidToToken({ uid: result.uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
