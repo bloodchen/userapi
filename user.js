@@ -186,7 +186,8 @@ export class User extends BaseService {
             return { code: 0, uid }
         })
         app.get('/_uid', async (req) => {
-            const uid = await this.getUID({ req })
+            const { token } = req.query
+            const uid = await this.getUID({ token })
             return { code: 0, uid }
         })
         app.get('/_info', async (req, res) => {
