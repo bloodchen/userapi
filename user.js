@@ -75,13 +75,13 @@ export class User extends BaseService {
         const siteUrl = process.env.siteUrl
         if (lang === 'cn') lang = 'zh'
         //check existing order
-        const order = await this.getOrder({ uid, product })
-        if (order && order.meta.mode === 'sub') {
-            const now = Math.floor(Date.now() / 1000)
-            if (order.meta.endTime > now) {
-                return { code: 101, msg: "order existed" }
-            }
-        }
+        /* const order = await this.getOrder({ uid, product })
+         if (order && order.meta.mode === 'sub') {
+             const now = Math.floor(Date.now() / 1000)
+             if (order.meta.endTime > now) {
+                 return { code: 101, msg: "order existed" }
+             }
+         } */
         /*if ((lang === 'zh') && !recurring) {
             const oid = 'wxpay_' + Date.now().toString(31)
             let price_cny = (price * config.rates['USD/CNY'] / 100).toFixed(2)
