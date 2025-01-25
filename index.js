@@ -35,6 +35,13 @@ async function main() {
 async function regEndpoints() {
     await app.register(cors, { origin: true, credentials: true, allowedHeaders: ['content-type'] });
     await app.register(fasticookie)
+    await app.register(import('fastify-raw-body'), {
+        field: 'rawBody', // change the default request.rawBody property name
+        global: false, // add the rawBody to every request. **Default true**
+        encoding: 'utf8', // set it to false to set rawBody as a Buffer **Default utf8**
+        runFirst: true, // get the body before any preParsing hook change/uncompress it. **Default false**
+        routes: [] // array of routes, **`global`** will be ignored, wildcard routes not supported
+    })
     app.addHook("preHandler", async (req, res) => {
         console.log(req.url)
     })
