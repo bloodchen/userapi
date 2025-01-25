@@ -237,11 +237,9 @@ export class User extends BaseService {
             return this.createPaymentUrl({ uid, product, success_url, cancel_url, lang })
         })
         app.get('/_pay/manage-subscription', async (req, res) => {
-            const uid = await this.getUID({ req })
-            if (!uid) return { code: 101, msg: "no uid" }
-            const order = await this.getOrder({ uid })
-            if (!order) return { code: 101, msg: "no order" }
-            const customerId = order.meta.customerId; // 从用户会话中获取 Stripe Customer ID
+            const customerId = req.query.cid; // 从用户会话中获取 Stripe Customer ID
+            if (!customerId) return { code: 101, msg: "no customerId" }
+            console.log("got customerId:", customerId)
             try {
                 const session = await stripe.billingPortal.sessions.create({
                     customer: customerId,
