@@ -260,7 +260,7 @@ export class User extends BaseService {
             //for http://api.maxthon.com
             const endpointSecret = this.endSecret
             let event;
-            console.log("got stripe callback body:", req.body)
+            console.log("got stripe callback body:", req.rawBody)
             try {
                 event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
             } catch (err) {
