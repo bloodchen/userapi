@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { BaseService } from "./common/baseService.js";
 import { MongoClient } from 'mongodb';
+import axios from "axios";
 
 let stripe = null
 const stripeTesting = true
@@ -68,24 +69,7 @@ export class User extends BaseService {
         console.log("got UID:", uid)
         return uid
     }
-    getOrderId({ uid, product }) {
-        return uid + '-' + product
-    }
-    async getOrder({ uid, product, all = false }) {
-        const docCol = this.db.collection('orders');
-        const id = this.getOrderId({ uid, product })
-        const condition = { uid }
-        if (product) condition.product = product
-        const result = await docCol.find(condition).sort({ ctime: -1 }).toArray()
-        return all ? result : result[0]
-    }
-    async createOrder({ uid, meta }) {
-        const docCol = this.db.collection('orders');
-        const ctime = Math.floor(Date.now() / 1000)
-        const { product } = meta
-        const result = await docCol.insertOne({ id: this.getOrderId({ uid, product }), uid, product, meta, ctime })
-        return result
-    }
+
     async createPaymentUrl({ uid, product, success_url, cancel_url, lang }) {
         const { config, util } = this.gl
         const siteUrl = process.env.siteUrl
@@ -173,9 +157,18 @@ export class User extends BaseService {
         meta.pid = paymentIntent.id
         meta.channel = 'stripe'
         meta.customerId = paymentIntent.customer
-        return await this.createOrder({ uid: +meta.uid, meta })
+        //const orderid = await this.createOrder({ uid: +meta.uid, meta })
+        this.notifyApp("order_paid", { meta })
+    }
+    async notifyApp({ event, para }) {
+        const { appServer } = process.env
+        axios.post(appServer + '/userapi/notify', { event, para })
     }
     async regEndpoints(app) {
+        app.get('/test', async (req, res) => {
+            this.notifyApp({ event: 'test', para: { uid: 100, name: "abc" } })
+            return { code: 0, msg: "ok" }
+        })
         app.get('/signup', async (req, res) => {
             const { util } = this.gl
             let token = util.getCookie({ name: `${this.pname}_ut`, req })

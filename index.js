@@ -42,10 +42,6 @@ async function regEndpoints() {
         console.log(req.url)
         return Config.project.name
     })
-    app.get('/test', async (req, res) => {
-
-        return "ok"
-    })
     app.post('/logSearch', async (req, res) => {
         const body = req.body
         console.log(body)
