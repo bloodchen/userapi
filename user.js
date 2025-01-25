@@ -158,7 +158,7 @@ export class User extends BaseService {
         meta.channel = 'stripe'
         meta.customerId = paymentIntent.customer
         //const orderid = await this.createOrder({ uid: +meta.uid, meta })
-        this.notifyApp("order_paid", { meta })
+        this.notifyApp({ event: "order_paid", para: { meta } })
     }
     async notifyApp({ event, para }) {
         const { appServer } = process.env
