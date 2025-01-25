@@ -236,7 +236,7 @@ export class User extends BaseService {
             const { product, success_url, cancel_url, lang = 'en' } = req.body
             return this.createPaymentUrl({ uid, product, success_url, cancel_url, lang })
         })
-        app.get('/pay/manage-subscription', async (req, res) => {
+        app.get('/_pay/manage-subscription', async (req, res) => {
             const uid = await this.getUID({ req })
             if (!uid) return { code: 101, msg: "no uid" }
             const order = await this.getOrder({ uid })
