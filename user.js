@@ -41,13 +41,12 @@ export class User extends BaseService {
         const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip) })
         return { code: 0, uid }
     }
-    async getUser({ uid, email, withOrder = false }) {
+    async getUser({ uid, email }) {
         const docCol = this.db.collection('users');
         uid = +uid
         const result = uid ? await docCol.findOne({ uid }) : await docCol.findOne({ email })
         if (!result) return null
         delete result._id
-        if (withOrder) result.order = await this.getOrder({ uid })
         return result
     }
     async updateUser({ uid, info }) {
@@ -157,12 +156,13 @@ export class User extends BaseService {
         meta.pid = paymentIntent.id
         meta.channel = 'stripe'
         meta.customerId = paymentIntent.customer
+        await this.updateUser({ uid: +meta.uid, info: { pay: meta } })
         //const orderid = await this.createOrder({ uid: +meta.uid, meta })
         this.notifyApp({ event: "order_paid", para: { meta } })
     }
     async notifyApp({ event, para }) {
         const { appServer } = process.env
-        axios.post(appServer + '/userapi/notify', { event, para })
+        axios.post(appServer + '/_userapi/notify', { event, para })
     }
     async regEndpoints(app) {
         app.get('/test', async (req, res) => {
