@@ -73,6 +73,7 @@ export class User extends BaseService {
         const { config, util } = this.gl
         const siteUrl = process.env.siteUrl
         if (lang === 'cn') lang = 'zh'
+        uid = +uid
         //check existing order
         /* const order = await this.getOrder({ uid, product })
          if (order && order.meta.mode === 'sub') {
@@ -97,7 +98,7 @@ export class User extends BaseService {
         if (!price) {
             return { code: 100, msg: "invalid product" }
         }
-        const metadata = { uid, product, v: '1', mode }
+        const metadata = { uid, product, v: 1, mode }
         const opts = {
             line_items: [{
                 price,
@@ -153,6 +154,7 @@ export class User extends BaseService {
                 return { code: 1, msg: "unknown product" }
             }
         }
+        meta.uid = +meta.uid
         meta.pid = paymentIntent.id
         meta.channel = 'stripe'
         meta.customerId = paymentIntent.customer
