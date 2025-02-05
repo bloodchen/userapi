@@ -82,4 +82,33 @@ export class Util extends BaseService {
     ipv4ToInt(ip) {
         return ip.split('.').reduce((int, part) => (int << 8) + parseInt(part, 10), 0);
     }
+    createUID({ type = 'normal' } = {}) {
+        const now = Math.floor(Date.now() / 1000)
+        let uid = now
+        if (this.lastnow >= now) {
+            uid = this.lastnow + 1
+            this.lastnow = uid
+        } else
+            this.lastnow = now
+        return +uid
+    }
+    randomNumber(n) {
+        if (n <= 0) {
+            throw new Error("The number of digits must be greater than 0.");
+        }
+
+        let number = ""; // 用于存储生成的数字
+
+        while (number.length < n) {
+            // 每次生成一个最多 `n` 位的随机部分，拼接到结果中
+            const remaining = n - number.length;
+            const maxDigits = Math.min(remaining, 12); // 限制最多生成 12 位（安全范围）
+            const min = Math.pow(10, maxDigits - 1);
+            const max = Math.pow(10, maxDigits) - 1;
+            const randomPart = Math.floor(Math.random() * (max - min + 1)) + min;
+            number += randomPart.toString(); // 拼接结果
+        }
+
+        return number.substring(0, n); // 截取结果，保证长度为 n
+    }
 }

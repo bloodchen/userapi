@@ -34,11 +34,11 @@ export class User extends BaseService {
         let i = 0
         if (await this.getUser({ email })) return { code: 1, msg: "email exists" }
 
-        while (i < 1000 && await this.getUser({ uid })) {
+        while (++i < 1000 && await this.getUser({ uid })) {
             uid++
         }
         if (i >= 1000) return { code: 1, msg: "uid exceed" }
-        const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip) })
+        const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip), tcs: uid })
         return { code: 0, uid }
     }
     async getUser({ uid, email }) {
@@ -235,7 +235,7 @@ export class User extends BaseService {
         })
         app.post('/pay/createPayment', async (req, res) => {
             const { util } = this.gl
-            const uid = 208; //await this.getUID({ req })
+            const uid = await this.getUID({ req })
             //if (!uid)return { code: 101, msg: "no uid" }
             const { product, success_url, cancel_url, lang = 'en' } = req.body
             return this.createPaymentUrl({ uid, product, success_url, cancel_url, lang })
