@@ -184,7 +184,7 @@ export class User extends BaseService {
             const { email, password } = req.query || {}
             const { uid } = await this.signup({ email, password, sip })
             token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
-            util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: false })
+            util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
             return { code: 0, uid }
         })
         app.get('/_uid', async (req) => {
