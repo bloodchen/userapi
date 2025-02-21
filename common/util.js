@@ -61,6 +61,7 @@ export class Util extends BaseService {
             const ver = token.slice(0, 2)
             const data = this.decrypt({ data: token.slice(2), password: this.tokenPass, from_encoding: "hex" })
             const user = JSON.parse(data)
+            console.log(user)
             return user || {}
         } catch (e) {
             console.error(e.message)
