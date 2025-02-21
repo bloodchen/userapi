@@ -183,6 +183,7 @@ export class User extends BaseService {
 
             const { email, password } = req.query || {}
             const { uid } = await this.signup({ email, password, sip })
+            if (!uid) return { code: 1, msg: "signup failed" }
             token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
             return { code: 0, uid }
@@ -228,6 +229,7 @@ export class User extends BaseService {
             const result = await this.getUser({ email })
             if (!result) return { code: 100, msg: "user not exist" }
             if (result.password != password) return { code: 101, msg: "password error" }
+            if (!result.uid) return { code: 101, msg: "no uid" }
             const { util } = this.gl
             const token = await util.uidToToken({ uid: result.uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
