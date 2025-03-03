@@ -27,10 +27,10 @@ export class User extends BaseService {
             console.error("MongoClient error:", e.message)
         }
     }
-    async signup({ email, password, sip }) {
+    async signup({ email, password, sip, uid, partner }) {
         const { util } = this.gl
         const docCol = this.db.collection('users');
-        const uid = Math.floor(Date.now() / 1000)
+        if (!uid) uid = Math.floor(Date.now() / 1000)
         let i = 0
         if (email && await this.getUser({ email })) return { code: 1, msg: "email exists" }
 
@@ -38,7 +38,7 @@ export class User extends BaseService {
             uid++
         }
         if (i >= 1000) return { code: 1, msg: "uid exceed" }
-        const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip), tcs: uid })
+        const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip), partner })
         return { code: 0, uid }
     }
     async getUser({ uid, email }) {
@@ -236,6 +236,21 @@ export class User extends BaseService {
             const token = await util.uidToToken({ uid: result.uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
             return { code: 0, uid: result.uid }
+        })
+        app.get('/login_partner', async (req, res) => {
+            const { util } = this.gl
+            const { partner, mxtoken } = req.query
+            const mxuser = await util.getMxUser({ mxtoken })
+            const uid = mxuser?.user_id
+            if (!uid) return { code: 101, msg: "not a valid mx user" }
+            const result = await this.getUser({ uid })
+            if (!result) {
+                const sip = util.getClientIp(req)
+                await this.signup({ uid, sip, partner: 'mx' })
+            }
+            const token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
+            util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
+            return { code: 0, uid }
         })
         app.post('/pay/createPayment', async (req, res) => {
             const { util } = this.gl

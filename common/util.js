@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { BaseService } from "./baseService.js";
+import axios from 'axios';
 
 export class Util extends BaseService {
     async init(gl) {
@@ -25,6 +26,12 @@ export class Util extends BaseService {
     getCookie({ req, name }) {
         return req.cookies[name]
     }
+    async getMxUser({ mxtoken }) {
+        const res = await axios.get('https://api.maxthon.com/web/profile', {
+            headers: { mxtoken }
+        })
+        return res.data || {}
+    }
     encrypt({ data, password, to_encoding = 'hex', iv, length = 256 }) {
         const buf = Buffer.from(data)
         if (iv) iv = Buffer.from(iv)
@@ -47,6 +54,7 @@ export class Util extends BaseService {
         }
 
     }
+
     async uidToToken({ uid, create, expire }) {
         try {
             const data = JSON.stringify({ uid, create, expire })
@@ -56,6 +64,7 @@ export class Util extends BaseService {
         }
         return null
     }
+
     async decodeToken({ token }) {
         try {
             const ver = token.slice(0, 2)
@@ -81,6 +90,7 @@ export class Util extends BaseService {
         return IP;
     }
     ipv4ToInt(ip) {
+        if (!ip) return null
         return ip.split('.').reduce((int, part) => (int << 8) + parseInt(part, 10), 0);
     }
     createUID({ type = 'normal' } = {}) {
