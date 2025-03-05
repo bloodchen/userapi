@@ -166,6 +166,16 @@ export class User extends BaseService {
         const { appServer } = process.env
         axios.post(appServer + '/_userapi/notify', { event, para })
     }
+    async sendCode({ email }) {
+        const mxServer = "https://api.maxthon.com"
+        const res = await axios.post(mxServer + '/web/sendcode', { email, code_id: "userapi_reset" + email })
+        return res.data
+    }
+    async verifyCode({ code, code_id }) {
+        const mxServer = "https://api.maxthon.com"
+        const res = await axios.post(mxServer + '/web/verifycode', { code, code_id })
+        return res.data
+    }
     async regEndpoints(app) {
         app.get('/test', async (req, res) => {
             this.notifyApp({ event: 'test', para: { uid: 100, name: "abc" } })
@@ -219,6 +229,21 @@ export class User extends BaseService {
             if (!uid)
                 return { code: 101, msg: "no uid" }
             const result = await this.updateUser({ uid, info })
+            return result
+        })
+        app.get('/sendCode', async (req, res) => {
+            const { email } = req.query
+            const result = await this.getUser({ email })
+            if (!result) return { code: 100, msg: "user not exist" }
+            return await this.sendCode({ email })
+        })
+        app.get('/resetPass', async (req, res) => {
+            const { email, code, new_pass } = req.query
+            let result = await this.verifyCode({ code, code_id: "userapi_reset" + email })
+            if (result.code != 0) return { code: 100, msg: "code error" }
+            const user = await this.getUser({ email })
+            if (!user) return { code: 100, msg: "user not exist" }
+            result = await this.updateUser({ uid: user.uid, info: { password: new_pass } })
             return result
         })
         app.get('/exist', async (req, res) => {
