@@ -4,19 +4,18 @@ import { MongoClient } from 'mongodb';
 import axios from "axios";
 
 const ERR = {
-    NO_USER: 100,
-    NO_UID: 101,
-    VIP_ONLY: 102,
-    NO_MORE_TOKEN: 103,
-    NO_MORE_DEVICE: 104,
-    API_TIMEOUT: 105,
-    UNKNOWN_MODEL: 106,
-    CODE_ERROR: 107,
-    PASSWORD_ERROR: 108,
-    NO_CUSTOMER_ID: 109,
-    EMAIL_EXISTS: 110,
-    INVALID_PRODUCT: 112,
-    GENERAL: 999,
+    NO_UID: 'ERR_NO_UID',
+    VIP_ONLY: 'ERR_VIP_ONLY',
+    NO_MORE_TOKEN: 'ERR_NO_MORE_TOKEN',
+    NO_MORE_DEVICE: 'ERR_NO_MORE_DEVICE',
+    API_TIMEOUT: 'ERR_API_TIMEOUT',
+    UNKNOWN_MODEL: 'ERR_UNKNOWN_MODEL',
+    NO_USER: 'ERR_USER_NOT_FOUND',
+    CODE_ERROR: 'ERR_CODE_ERROR',
+    PASSWORD_ERROR: 'ERR_PASSWORD_ERROR',
+    NO_CUSTOMER_ID: 'ERR_NO_CUSTOMER_ID',
+    EMAIL_EXISTS: 'ERR_EMAIL_EXISTS',
+    INVALID_PRODUCT: 'ERR_INVALID_PRODUCT',
 }
 let stripe = null
 const stripeTesting = true
@@ -47,12 +46,12 @@ export class User extends BaseService {
         const docCol = this.db.collection('users');
         if (!uid) uid = Math.floor(Date.now() / 1000)
         let i = 0
-        if (email && await this.getUser({ email })) return { code: ERR.EMAIL_EXISTS, msg: "email exists" }
+        if (email && await this.getUser({ email })) return { code: 100, msg: ERR.EMAIL_EXISTS }
 
         while (++i < 1000 && await this.getUser({ uid })) {
             uid++
         }
-        if (i >= 1000) return { code: ERR.GENERAL, msg: "uid exceed" }
+        if (i >= 1000) return { code: 100, msg: "uid exceed" }
         const result = await docCol.insertOne({ uid, email, password, sip: util.ipv4ToInt(sip), partner })
         return { code: 0, uid }
     }
@@ -69,7 +68,7 @@ export class User extends BaseService {
         uid = +uid
         const result = await docCol.updateOne({ uid }, { $set: info })
         if (result.modifiedCount > 0 || result.upsertedCount > 0) return { code: 0, msg: "success" }
-        return { code: ERR.GENERAL, msg: result }
+        return { code: 100, msg: result }
     }
     async getUID({ req, token }) {
         const { util } = this.gl
@@ -111,7 +110,7 @@ export class User extends BaseService {
 
         const { coupon, mode, price } = config.payment[product]
         if (!price) {
-            return { code: ERR.INVALID_PRODUCT, msg: "invalid product" }
+            return { code: 100, msg: ERR.INVALID_PRODUCT }
         }
         const metadata = { uid, product, v: 1, mode }
         const opts = {
@@ -147,12 +146,12 @@ export class User extends BaseService {
                 meta = subscription?.metadata;
                 if (!meta) {
                     console.error('no metadata')
-                    return { code: ERR.GENERAL, msg: "no metadata" }
+                    return { code: 100, msg: "no metadata" }
                 }
                 const { product } = meta
                 if (!config.payment[product] && !['diamond', 'gold'].includes(product)) {
                     console.error('unknown product')
-                    return { code: ERR.GENERAL, msg: "unknown product" }
+                    return { code: 100, msg: "unknown product" }
                 }
                 meta.endTime = subscription.current_period_end;
                 meta.sub_id = subscription.id
@@ -161,12 +160,12 @@ export class User extends BaseService {
             meta = paymentIntent.metadata
             if (!meta) {
                 console.error('no metadata')
-                return { code: ERR.GENERAL, msg: "no metadata" }
+                return { code: 100, msg: "no metadata" }
             }
             const { product } = meta
             if (!config.cost[product] || !['diamond', 'gold'].includes(product)) {
                 console.error('unknown product')
-                return { code: ERR.GENERAL, msg: "unknown product" }
+                return { code: 100, msg: "unknown product" }
             }
         }
         meta.uid = +meta.uid
@@ -202,7 +201,7 @@ export class User extends BaseService {
             if (token) {
                 const { uid } = await util.decodeToken({ token })
                 if (uid)
-                    return { code: ERR.GENERAL, msg: "already logged in" }
+                    return { code: 100, msg: "already logged in" }
             }
             const sip = util.getClientIp(req)
 
@@ -210,7 +209,7 @@ export class User extends BaseService {
             const sresult = await this.signup({ email, password, sip })
             console.log(sresult)
             const { uid } = sresult
-            if (!uid) return { code: ERR.GENERAL, msg: "signup failed" }
+            if (!uid) return { code: 100, msg: "signup failed" }
             token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
             return { code: 0, uid }
@@ -225,7 +224,7 @@ export class User extends BaseService {
             const { util } = this.gl
             let { uid, email } = req.query
             if (!uid && !email) {
-                return { code: ERR.NO_UID, msg: "uid or email required" }
+                return { code: 100, msg: ERR.NO_UID }
             }
             const result = await this.getUser({ uid, email })
             return { code: 0, info: result }
@@ -233,7 +232,7 @@ export class User extends BaseService {
         app.get('/info', async (req, res) => {
             const uid = await this.getUID({ req })
             if (!uid)
-                return { code: ERR.NO_UID, msg: "no uid" }
+                return { code: 100, msg: ERR.NO_UID }
             const { withOrder } = req.query
             const result = await this.getUser({ uid, withOrder })
             return { code: 0, info: result }
@@ -242,22 +241,22 @@ export class User extends BaseService {
             const { info } = req.body
             const uid = await this.getUID({ req })
             if (!uid)
-                return { code: ERR.NO_UID, msg: "no uid" }
+                return { code: 100, msg: ERR.NO_UID }
             const result = await this.updateUser({ uid, info })
             return result
         })
         app.get('/sendCode', async (req, res) => {
             const { email } = req.query
             const result = await this.getUser({ email })
-            if (!result) return { code: ERR.NO_USER, msg: "user not exist" }
+            if (!result) return { code: 100, msg: ERR.NO_USER }
             return await this.sendCode({ email })
         })
         app.get('/resetPass', async (req, res) => {
             const { email, code, new_pass } = req.query
             let result = await this.verifyCode({ code, code_id: "userapi_reset" + email })
-            if (result.code != 0) return { code: ERR.CODE_ERROR, msg: "code error" }
+            if (result.code != 0) return { code: 100, msg: ERR.CODE_ERROR }
             const user = await this.getUser({ email })
-            if (!user) return { code: ERR.NO_USER, msg: "user not exist" }
+            if (!user) return { code: 100, msg: ERR.NO_USER }
             result = await this.updateUser({ uid: user.uid, info: { password: new_pass } })
             return result
         })
@@ -269,9 +268,9 @@ export class User extends BaseService {
         app.get('/login', async (req, res) => {
             const { email, password } = req.query
             const result = await this.getUser({ email })
-            if (!result) return { code: ERR.NO_USER, msg: "user not exist" }
-            if (result.password != password) return { code: ERR.PASSWORD_ERROR, msg: "password error" }
-            if (!result.uid) return { code: ERR.NO_UID, msg: "no uid" }
+            if (!result) return { code: 100, msg: ERR.NO_USER }
+            if (result.password != password) return { code: 100, msg: ERR.PASSWORD_ERROR }
+            if (!result.uid) return { code: 100, msg: ERR.NO_UID }
             const { util } = this.gl
             const token = await util.uidToToken({ uid: result.uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
             util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
@@ -282,7 +281,7 @@ export class User extends BaseService {
             const { partner, mxtoken } = req.query
             const mxuser = await util.getMxUser({ mxtoken })
             const uid = mxuser?.user_id
-            if (!uid) return { code: ERR.NO_USER, msg: "not a valid mx user" }
+            if (!uid) return { code: 100, msg: ERR.NO_USER }
             const result = await this.getUser({ uid })
             if (!result) {
                 const sip = util.getClientIp(req)
@@ -301,7 +300,7 @@ export class User extends BaseService {
         })
         app.get('/_pay/manage-subscription', async (req, res) => {
             const customerId = req.query.cid; // 从用户会话中获取 Stripe Customer ID
-            if (!customerId) return { code: ERR.NO_CUSTOMER_ID, msg: "no customerId" }
+            if (!customerId) return { code: 100, msg: ERR.NO_CUSTOMER_ID }
             console.log("got customerId:", customerId)
             try {
                 const session = await stripe.billingPortal.sessions.create({
