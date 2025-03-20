@@ -108,7 +108,7 @@ export class User extends BaseService {
 
         success_url += "?session_id={CHECKOUT_SESSION_ID}"
 
-        const { coupon, mode, price } = config.payment[product]
+        const { coupon, mode, price, trial } = config.payment[product]
         if (!price) {
             return { code: 100, msg: ERR.INVALID_PRODUCT }
         }
@@ -126,7 +126,10 @@ export class User extends BaseService {
             payment_method_types: ['card', 'alipay'],
         }
 
-        if (opts.mode === 'subscription') opts.subscription_data = { metadata }
+        if (opts.mode === 'subscription') {
+            opts.subscription_data = { metadata }
+            if (trial) opts.subscription_data.trial_period_days = trial
+        }
         if (opts.mode === 'payment') opts.payment_intent_data = { metadata }
 
         const session = await stripe.checkout.sessions.create(opts);
