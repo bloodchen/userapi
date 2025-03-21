@@ -18,7 +18,7 @@ const ERR = {
     INVALID_PRODUCT: 'ERR_INVALID_PRODUCT',
 }
 let stripe = null
-const stripeTesting = true
+const stripeTesting = false
 export class User extends BaseService {
     async init(gl) {
         try {
