@@ -108,10 +108,12 @@ export class User extends BaseService {
 
         success_url += "?session_id={CHECKOUT_SESSION_ID}"
 
-        const { coupon, mode, price, trial } = config.payment[product]
+        let { coupon, mode, price, trial, price_zh, coupon_zh } = config.payment[product]
         if (!price) {
             return { code: 100, msg: ERR.INVALID_PRODUCT }
         }
+        if (lang === 'zh' && price_zh) price = price_zh
+        if (lang === 'zh' && coupon_zh) coupon = coupon_zh
         const metadata = { uid, product, v: 1, mode }
         const opts = {
             line_items: [{
@@ -123,7 +125,8 @@ export class User extends BaseService {
             }],
             metadata, client_reference_id: uid,
             mode: mode === 'sub' ? "subscription" : "payment", success_url, cancel_url, automatic_tax: { enabled: true },
-            payment_method_types: ['card', 'alipay'],
+            payment_method_types: ['alipay', 'card'],
+            //customer_email: 'test+location_CN@example.com'
         }
 
         if (opts.mode === 'subscription') {
