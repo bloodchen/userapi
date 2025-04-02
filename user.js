@@ -48,7 +48,10 @@ export class User extends BaseService {
         const docCol = this.db.collection('users');
         if (!uid) uid = Math.floor(Date.now() / 1000)
         let i = 0
-        if (email && await this.getUser({ email })) return { code: 100, msg: ERR.EMAIL_EXISTS }
+        if (email) {
+            const u = await this.getUser({ email })
+            if (u) return { code: 100, uid: u.uid, msg: ERR.EMAIL_EXISTS }
+        }
 
         while (++i < 1000 && await this.getUser({ uid })) {
             uid++
@@ -353,7 +356,8 @@ export class User extends BaseService {
             // Return a 200 response to acknowledge receipt of the event
             return { code: 0 }
         })
-        app.post('/verify-google-token', async (req, reply) => {
+        app.post('/verify-google-token', async (req, res) => {
+            const { util } = this.gl
             const { token } = req.body;
             try {
                 const ticket = await this.oauth.verifyIdToken({
@@ -363,6 +367,13 @@ export class User extends BaseService {
 
                 const payload = ticket.getPayload();  // 解码后的用户信息
                 console.log("verify-google-token: got", payload);
+                if (payload.email) {
+                    const sip = util.getClientIp(req)
+                    const password = payload.email + "_G_" + payload.family_name
+                    const { uid } = await this.signup({ email, password, sip })
+                    const token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
+                    util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
+                }
                 // 示例返回
                 return {
                     name: payload.name,
@@ -372,7 +383,7 @@ export class User extends BaseService {
                 };
             } catch (err) {
                 console.error("验证失败:", err);
-                reply.status(401).send({ error: "无效的 Google token" });
+                res.status(401).send({ error: "无效的 Google token" });
             }
         });
     }
