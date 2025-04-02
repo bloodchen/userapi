@@ -367,11 +367,12 @@ export class User extends BaseService {
 
                 const payload = ticket.getPayload();  // 解码后的用户信息
                 console.log("verify-google-token: got", payload);
+                let uid = 0
                 if (payload.email) {
                     const { email } = payload
                     const sip = util.getClientIp(req)
-                    const password = payload.email + "_G_" + payload.family_name
-                    const { uid } = await this.signup({ email, password, sip })
+                    const password = payload.email + "_G_" + payload.family_name;
+                    ({ uid } = await this.signup({ email, password, sip, partner: 'google' }))
                     const token = await util.uidToToken({ uid, create: Date.now(), expire: Date.now() + 3600 * 24 * 30 })
                     util.setCookie({ req, res, name: `${this.pname}_ut`, value: token, days: 30, secure: true })
                 }
