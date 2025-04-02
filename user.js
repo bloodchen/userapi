@@ -351,5 +351,28 @@ export class User extends BaseService {
             // Return a 200 response to acknowledge receipt of the event
             return { code: 0 }
         })
+        app.post('/verify-google-token', async (req, reply) => {
+            const { token } = req.body;
+            try {
+                const ticket = await client.verifyIdToken({
+                    idToken: token,
+                    audience: "111015791863-mvevc0jau39k9mrocfisr6cn9nr39pqj.apps.googleusercontent.com", // 保证 token 是发给你的
+                });
+
+                const payload = ticket.getPayload();  // 解码后的用户信息
+                console.log("verify-google-token: got", payload);
+                // 示例返回
+                return {
+                    name: payload.name,
+                    email: payload.email,
+                    picture: payload.picture,
+                    googleId: payload.sub,
+                };
+            } catch (err) {
+                console.error("验证失败:", err);
+                reply.status(401).send({ error: "无效的 Google token" });
+            }
+        });
     }
+
 }
