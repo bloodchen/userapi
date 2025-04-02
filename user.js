@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { OAuth2Client } from 'google-auth-library';
 import { BaseService } from "./common/baseService.js";
 import { MongoClient } from 'mongodb';
 import axios from "axios";
@@ -37,6 +38,7 @@ export class User extends BaseService {
                 stripe = Stripe(process.env.stripe_key)
             }
             gl.stripe = stripe
+            this.oauth = new OAuth2Client(process.env.google_cid);
         } catch (e) {
             console.error("MongoClient error:", e.message)
         }
@@ -354,7 +356,7 @@ export class User extends BaseService {
         app.post('/verify-google-token', async (req, reply) => {
             const { token } = req.body;
             try {
-                const ticket = await client.verifyIdToken({
+                const ticket = await this.oauth.verifyIdToken({
                     idToken: token,
                     audience: "111015791863-mvevc0jau39k9mrocfisr6cn9nr39pqj.apps.googleusercontent.com", // 保证 token 是发给你的
                 });
