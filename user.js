@@ -382,6 +382,7 @@ export class User extends BaseService {
                     email: payload.email,
                     picture: payload.picture,
                     googleId: payload.sub,
+                    uid,
                 };
             } catch (err) {
                 console.error("验证失败:", err);
