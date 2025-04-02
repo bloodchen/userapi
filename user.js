@@ -50,7 +50,6 @@ export class User extends BaseService {
         let i = 0
         if (email) {
             const u = await this.getUser({ email })
-            console.log("got user:", u)
             if (u) return { code: 100, uid: u.uid, msg: ERR.EMAIL_EXISTS }
         }
 
