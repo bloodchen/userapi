@@ -368,6 +368,7 @@ export class User extends BaseService {
                 const payload = ticket.getPayload();  // 解码后的用户信息
                 console.log("verify-google-token: got", payload);
                 if (payload.email) {
+                    const { email } = payload
                     const sip = util.getClientIp(req)
                     const password = payload.email + "_G_" + payload.family_name
                     const { uid } = await this.signup({ email, password, sip })
