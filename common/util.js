@@ -122,4 +122,7 @@ export class Util extends BaseService {
 
         return number.substring(0, n); // 截取结果，保证长度为 n
     }
+    now() {
+        return Math.floor(Date.now() / 1000)
+    }
 }

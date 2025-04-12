@@ -17,6 +17,7 @@ const ERR = {
     NO_CUSTOMER_ID: 'ERR_NO_CUSTOMER_ID',
     EMAIL_EXISTS: 'ERR_EMAIL_EXISTS',
     INVALID_PRODUCT: 'ERR_INVALID_PRODUCT',
+    ALREADY_PAID: 'ERR_ALREADY_PAID',
 }
 let stripe = null
 const stripeTesting = false
@@ -93,7 +94,13 @@ export class User extends BaseService {
         const siteUrl = process.env.siteUrl
         if (lang === 'cn') lang = 'zh'
         uid = +uid
-        if (await this.getUser({ uid }) == null) return { code: 100, msg: NO_USER }
+        const user = await this.getUser({ uid })
+        if (!user) return { code: 100, msg: ERR.NO_USER }
+        const { pay } = user
+        if (pay && pay[product] === product && pay.endTime > util.now()) {
+            console.error("already paid")
+            return { code: 100, msg: ERR.ALREADY_PAID }
+        }
 
         if (!success_url) success_url = siteUrl + "/pay_success"
         if (!cancel_url) cancel_url = siteUrl + "/pay_cancel" //config.topup
