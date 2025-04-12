@@ -101,7 +101,7 @@ export class User extends BaseService {
             console.error("already paid")
             return { code: 100, msg: ERR.ALREADY_PAID }
         }
-
+        util.sendMail({ subject: "uugpt payment intent", text: `${uid} ${product}` })
         if (!success_url) success_url = siteUrl + "/pay_success"
         if (!cancel_url) cancel_url = siteUrl + "/pay_cancel" //config.topup
 

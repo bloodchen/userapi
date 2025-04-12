@@ -125,4 +125,12 @@ export class Util extends BaseService {
     now() {
         return Math.floor(Date.now() / 1000)
     }
+    async sendMail({ to = "bloodchen@gmail.com", subject, text }) {
+        const res = await axios.post(`https://api.maxthon.com/service/mail`, { key: process.env.mxapi_key, to, subject, text })
+        if (res.data && res.data.code === 0) {
+            return true
+        }
+        console.error("sendMail error:", res.data)
+        return false
+    }
 }
