@@ -157,7 +157,9 @@ export class User extends BaseService {
                 meta.status = subscription.status
                 meta.endTime = subscription.current_period_end;
                 meta.sub_id = subscription.id
-            }; break;
+
+                break;
+            }
             case 'payment_intent.succeeded': { //part of subsciption
                 if (object.invoice) { //handled in invoice.paid
                     return { code: 0, msg: "already handled" }
@@ -174,8 +176,9 @@ export class User extends BaseService {
                 }
                 meta.mode = 'pay'
                 meta.status = 'paid'
-                meta.amount = object.amount_received
-            }; break;
+                meta.amount = object.amount_received;
+                break;
+            };
             default: {
                 console.error('Unhandled event type:', event);
                 return { code: 100, msg: "unknown event" }
