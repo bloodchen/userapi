@@ -136,13 +136,13 @@ export class User extends BaseService {
         const { config } = this.gl
         let meta = {}
         switch (event) {
-            case 'invoice.paid': {
-                const invoice = object;
+            case 'customer.subscription.created':
+            case 'customer.subscription.updated': {
+                const subscription = object;
                 // Access the metadata
-                console.log("got invoice:", invoice)
-                const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+                console.log("got subscription:", subscription)
 
-                meta = invoice.subscription_details.metadata;
+                meta = subscription.metadata;
                 console.log("got metadata:", meta)
                 if (!meta) {
                     console.error('no metadata')
@@ -154,10 +154,9 @@ export class User extends BaseService {
                     return { code: 100, msg: "unknown product" }
                 }
                 meta.mode = 'sub'
-                meta.status = invoice.amount_paid === 0 ? 'trial' : invoice.status
-                meta.amount = invoice.amount_paid
+                meta.status = subscription.status
                 meta.endTime = subscription.current_period_end;
-                meta.sub_id = invoice.subscription
+                meta.sub_id = subscription.id
             }; break;
             case 'payment_intent.succeeded': { //part of subsciption
                 if (object.invoice) { //handled in invoice.paid
