@@ -93,21 +93,8 @@ export class User extends BaseService {
         const siteUrl = process.env.siteUrl
         if (lang === 'cn') lang = 'zh'
         uid = +uid
-        //check existing order
-        /* const order = await this.getOrder({ uid, product })
-         if (order && order.meta.mode === 'sub') {
-             const now = Math.floor(Date.now() / 1000)
-             if (order.meta.endTime > now) {
-                 return { code: 101, msg: "order existed" }
-             }
-         } */
-        /*if ((lang === 'zh') && !recurring) {
-            const oid = 'wxpay_' + Date.now().toString(31)
-            let price_cny = (price * config.rates['USD/CNY'] / 100).toFixed(2)
-            await redis.set(oid, JSON.stringify(metadata), 'ex', 60 * 60 * 24) //expire in 24 hours
-            console.log("created wx pay:", oid)
-            return { code: 0, url: siteUrl + `/static/wxpay.html?price=${price_cny}&oid=${oid}&product=${product}` }
-        }*/
+        if (await this.getUser({ uid }) == null) return { code: 100, msg: NO_USER }
+
         if (!success_url) success_url = siteUrl + "/pay_success"
         if (!cancel_url) cancel_url = siteUrl + "/pay_cancel" //config.topup
 
@@ -145,47 +132,61 @@ export class User extends BaseService {
         return { code: 0, url: session.url }
 
     }
-    async stripe_handleSuccess(paymentIntent) {
+    async stripe_handleEvent(event, object) {
         const { config } = this.gl
         let meta = {}
-        if (paymentIntent.invoice) { //part of subsciption
-            const invoice = await stripe.invoices.retrieve(paymentIntent.invoice);
-            if (invoice) {
-                const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+        switch (event) {
+            case 'invoice.paid': {
+                const invoice = object;
                 // Access the metadata
-                console.log("got subscription:", subscription)
-                meta = subscription?.metadata;
+                console.log("got invoice:", invoice)
+                meta = invoice.subscription_details.metadata;
+                console.log("got metadata:", meta)
                 if (!meta) {
                     console.error('no metadata')
                     return { code: 100, msg: "no metadata" }
                 }
                 const { product } = meta
-                if (!config.payment[product] && !['diamond', 'gold'].includes(product)) {
+                if (!config.payment[product]) {
                     console.error('unknown product')
                     return { code: 100, msg: "unknown product" }
                 }
-                meta.endTime = subscription.current_period_end;
-                meta.sub_id = subscription.id
-            }
-        } else { //onetime payment
-            meta = paymentIntent.metadata
-            if (!meta) {
-                console.error('no metadata')
-                return { code: 100, msg: "no metadata" }
-            }
-            const { product } = meta
-            if (!config.cost[product] || !['diamond', 'gold'].includes(product)) {
-                console.error('unknown product')
-                return { code: 100, msg: "unknown product" }
+                meta.mode = 'sub'
+                meta.status = invoice.amount_paid === 0 ? 'trial' : invoice.status
+                meta.amount = invoice.amount_paid
+                meta.endTime = invoice.period_end;
+                meta.sub_id = invoice.subscription
+            }; break;
+            case 'payment_intent.succeeded': { //part of subsciption
+                if (object.invoice) { //handled in invoice.paid
+                    return { code: 0, msg: "already handled" }
+                }
+                meta = object.metadata
+                if (!meta) {
+                    console.error('no metadata')
+                    return { code: 100, msg: "no metadata" }
+                }
+                const { product } = meta
+                if (!config.payment[product]) {
+                    console.error('unknown product')
+                    return { code: 100, msg: "unknown product" }
+                }
+                meta.mode = 'pay'
+                meta.status = 'paid'
+                meta.amount = object.amount_received
+            }; break;
+            default: {
+                console.error('Unhandled event type:', event);
+                return { code: 100, msg: "unknown event" }
             }
         }
         meta.uid = +meta.uid
-        meta.pid = paymentIntent.id
         meta.channel = 'stripe'
-        meta.customerId = paymentIntent.customer
-        await this.updateUser({ uid: +meta.uid, info: { pay: meta } })
+        meta.customerId = object.customer
+        await this.updateUser({ uid: meta.uid, info: { pay: meta } })
         //const orderid = await this.createOrder({ uid: +meta.uid, meta })
         this.notifyApp({ event: "order_paid", para: { meta } })
+        return { code: 0, msg: "done" }
     }
     async notifyApp({ event, para }) {
         const { appServer } = process.env
@@ -331,7 +332,7 @@ export class User extends BaseService {
             //for http://api.maxthon.com
             const endpointSecret = this.endSecret
             let event;
-            console.log("got stripe callback body:", req.rawBody)
+            //console.log("got stripe callback body:", req.rawBody)
             try {
                 event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
             } catch (err) {
@@ -340,18 +341,7 @@ export class User extends BaseService {
                 return;
             }
             console.log('stripe event:', event)
-            // Handle the event
-            switch (event.type) {
-                case 'payment_intent.succeeded':
-                    const paymentIntentSucceeded = event.data.object;
-                    console.log(paymentIntentSucceeded)
-                    this.stripe_handleSuccess(paymentIntentSucceeded)
-                    // Then define and call a function to handle the event payment_intent.succeeded
-                    break;
-                // ... handle other event types
-                default:
-                    console.log(`Unhandled event type ${event.type}`);
-            }
+            this.stripe_handleEvent(event.type, event.data.object)
 
             // Return a 200 response to acknowledge receipt of the event
             return { code: 0 }

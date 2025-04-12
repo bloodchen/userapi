@@ -80,7 +80,7 @@ export class Util extends BaseService {
     getClientIp(req) {
         let IP =
             //req.ip ||
-            req.headers['CF-Connecting-IP'] ||
+            req.headers['cf-connecting-ip'] ||
             req.headers["x-forwarded-for"] ||
             req.socket.remoteAddress ||
             req.connection.remoteAddress ||
