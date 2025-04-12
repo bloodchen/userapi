@@ -140,6 +140,8 @@ export class User extends BaseService {
                 const invoice = object;
                 // Access the metadata
                 console.log("got invoice:", invoice)
+                const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+
                 meta = invoice.subscription_details.metadata;
                 console.log("got metadata:", meta)
                 if (!meta) {
@@ -154,7 +156,7 @@ export class User extends BaseService {
                 meta.mode = 'sub'
                 meta.status = invoice.amount_paid === 0 ? 'trial' : invoice.status
                 meta.amount = invoice.amount_paid
-                meta.endTime = invoice.period_end;
+                meta.endTime = subscription.current_period_end;
                 meta.sub_id = invoice.subscription
             }; break;
             case 'payment_intent.succeeded': { //part of subsciption
