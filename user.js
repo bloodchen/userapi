@@ -140,7 +140,7 @@ export class User extends BaseService {
 
     }
     async stripe_handleEvent(event, object) {
-        const { config } = this.gl
+        const { config, util } = this.gl
         let meta = {}
         switch (event) {
             case 'customer.subscription.created':
@@ -197,6 +197,8 @@ export class User extends BaseService {
         await this.updateUser({ uid: meta.uid, info: { pay: meta } })
         //const orderid = await this.createOrder({ uid: +meta.uid, meta })
         this.notifyApp({ event: "order_paid", para: { meta } })
+        util.sendMail({ subject: "uugpt order updated", text: JSON.stringify(meta) })
+
         return { code: 0, msg: "done" }
     }
     async notifyApp({ event, para }) {
