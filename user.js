@@ -215,7 +215,8 @@ export class User extends BaseService {
     }
     async regEndpoints(app) {
         app.get('/test', async (req, res) => {
-            this.notifyApp({ event: 'test', para: { uid: 100, name: "abc" } })
+            //this.notifyApp({ event: 'test', para: { uid: 100, name: "abc" } })
+            await this.gl.util.sendMail({ subject: "abc" })
             return { code: 0, msg: "ok" }
         })
         app.get('/signup', async (req, res) => {
@@ -317,7 +318,7 @@ export class User extends BaseService {
         app.post('/pay/createPayment', async (req, res) => {
             const { util } = this.gl
             const uid = await this.getUID({ req })
-            //if (!uid)return { code: 101, msg: "no uid" }
+            if (!uid) return { code: 101, msg: "no uid,please login first" }
             const { product, success_url, cancel_url, lang = 'en' } = req.body
             return this.createPaymentUrl({ uid, product, success_url, cancel_url, lang })
         })
