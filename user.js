@@ -19,7 +19,6 @@ const ERR = {
     INVALID_PRODUCT: 'ERR_INVALID_PRODUCT',
     ALREADY_PAID: 'ERR_ALREADY_PAID',
 }
-let stripe = null
 const stripeTesting = false
 export class User extends BaseService {
     async init(gl) {
@@ -31,14 +30,17 @@ export class User extends BaseService {
             this.pname = config.project.name || 'userapi'
             this.db = this.client.db(this.pname);
             gl.mongo = this.client
-            if (stripeTesting) {
-                this.endSecret = process.env.stripe_sec_test//mx testing
-                stripe = Stripe(process.env.stripe_key_test)
-            } else {
-                this.endSecret = process.env.stripe_sec //maxthon
-                stripe = Stripe(process.env.stripe_key)
-            }
+            this.customerId = null //for stripe customer id
+
+            //setup stripe
+            this.endSecret_test = process.env.stripe_sec_test//mx testing
+            const stripe_test = Stripe(process.env.stripe_key_test)
+            this.endSecret = process.env.stripe_sec //maxthon
+            const stripe = Stripe(process.env.stripe_key)
             gl.stripe = stripe
+            gl.stripe_test = stripe_test
+
+            //setup google oauth
             this.oauth = new OAuth2Client(process.env.google_cid);
         } catch (e) {
             console.error("MongoClient error:", e.message)
@@ -78,6 +80,9 @@ export class User extends BaseService {
     }
     async getUID({ req, token }) {
         const { util } = this.gl
+        if (process.env.build == 'dev') {
+            return +req.query.uid
+        }
         if (!token) token = util.getCookie({ name: `${this.pname}_ut`, req })
         if (!token) {
             console.error("no token")
@@ -89,23 +94,24 @@ export class User extends BaseService {
         return uid
     }
 
-    async createPaymentUrl({ uid, product, success_url, cancel_url, lang }) {
+    async createPaymentUrl({ app = 'uugpt', uid, product, success_url, cancel_url, lang = 'en', test = false }) {
         const { config, util } = this.gl
+        const stripe = test ? this.gl.stripe_test : this.gl.stripe
         const siteUrl = process.env.siteUrl
         if (lang === 'cn') lang = 'zh'
         uid = +uid
-        const user = await this.getUser({ uid })
+        /*const user = await this.getUser({ uid })
         if (!user) return { code: 100, msg: ERR.NO_USER }
         const { pay } = user
         if (pay && pay[product] === product && pay.endTime > util.now()) {
             console.error("already paid")
             return { code: 100, msg: ERR.ALREADY_PAID }
-        }
-        util.sendMail({ subject: "uugpt payment intent", text: `${uid} ${product}` })
-        if (!success_url) success_url = siteUrl + "/pay_success"
-        if (!cancel_url) cancel_url = siteUrl + "/pay_cancel" //config.topup
+        }*/
+        util.sendMail({ subject: `${app} payment intent`, text: `${uid} ${product}` })
+        //if (!success_url) success_url = siteUrl + "/pay_success"
+        //if (!cancel_url) cancel_url = siteUrl + "/pay_cancel" //config.topup
 
-        success_url += "?session_id={CHECKOUT_SESSION_ID}"
+        success_url && (success_url += "?session_id={CHECKOUT_SESSION_ID}")
 
         let { coupon, mode, price, trial, price_zh, coupon_zh } = config.payment[product]
         if (!price) {
@@ -113,7 +119,7 @@ export class User extends BaseService {
         }
         if (lang === 'zh' && price_zh) price = price_zh
         if (lang === 'zh' && coupon_zh) coupon = coupon_zh
-        const metadata = { uid, product, v: 1, mode }
+        const metadata = { app, uid, product, v: 1, mode }
         const opts = {
             line_items: [{
                 price,
@@ -150,7 +156,6 @@ export class User extends BaseService {
                 console.log("got subscription:", subscription)
 
                 meta = subscription.metadata;
-                console.log("got metadata:", meta)
                 if (!meta) {
                     console.error('no metadata')
                     return { code: 100, msg: "no metadata" }
@@ -191,19 +196,30 @@ export class User extends BaseService {
                 return { code: 100, msg: "unknown event" }
             }
         }
-        meta.uid = +meta.uid
-        meta.channel = 'stripe'
-        meta.customerId = object.customer
-        await this.updateUser({ uid: meta.uid, info: { pay: meta } })
-        //const orderid = await this.createOrder({ uid: +meta.uid, meta })
-        this.notifyApp({ event: "order_paid", para: { meta } })
-        util.sendMail({ subject: "uugpt order updated", text: JSON.stringify(meta) })
-
+        if (this.customerId !== object.customer) {
+            this.customerId = object.customer
+            console.log("got customerId:", this.customerId)
+            meta.uid = +meta.uid
+            meta.channel = 'stripe'
+            meta.customerId = object.customer
+            console.log("got metadata:", meta)
+            await this.updateUser({ uid: meta.uid, info: { pay: meta } })
+            this.notifyApp({ event: "order_paid", para: { meta } })
+            util.sendMail({ subject: meta.app + " order updated", text: JSON.stringify({ event, meta }) })
+        }
         return { code: 0, msg: "done" }
     }
     async notifyApp({ event, para }) {
+        const { config } = this.gl
         const { appServer } = process.env
-        axios.post(appServer + '/_userapi/notify', { event, para })
+        const { app = 'uugpt' } = para.meta
+        const notifyUrl = config.apps[app]?.notifyUrl || `${appServer}/_userapi/notify`
+        console.log("notifyApp:", notifyUrl, event, para)
+        try {
+            await axios.post(notifyUrl, { event, para })
+        } catch (error) {
+            console.error("notifyApp error:", error)
+        }
     }
     async sendCode({ email }) {
         const mxServer = "https://api.maxthon.com"
@@ -318,11 +334,9 @@ export class User extends BaseService {
             return { code: 0, uid }
         })
         app.post('/pay/createPayment', async (req, res) => {
-            const { util } = this.gl
-            const uid = await this.getUID({ req })
+            const uid = await this.getUID({ req }) || req.body?.uid
             if (!uid) return { code: 101, msg: "no uid,please login first" }
-            const { product, success_url, cancel_url, lang = 'en' } = req.body
-            return this.createPaymentUrl({ uid, product, success_url, cancel_url, lang })
+            return this.createPaymentUrl({ uid, ...req.body })
         })
         app.get('/_pay/manage-subscription', async (req, res) => {
             const customerId = req.query.cid; // 从用户会话中获取 Stripe Customer ID
@@ -337,6 +351,25 @@ export class User extends BaseService {
             } catch (error) {
                 res.status(500).send('Unable to load subscription management page');
             }
+        })
+        app.post('/pay/callback/stripe_test', { config: { rawBody: true } }, async (req, res) => {
+            const { stripe_test } = this.gl
+            const sig = req.headers['stripe-signature'];
+            const endpointSecret = this.endSecret_test
+            let event;
+            console.log("got stripe test callback body:", req.rawBody)
+            try {
+                event = stripe_test.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+            } catch (err) {
+                console.error(err.message)
+                res.status(400).send(`Webhook Error: ${err.message}`);
+                return;
+            }
+            console.log('stripe event:', event)
+            this.stripe_handleEvent(event.type, event.data.object)
+
+            // Return a 200 response to acknowledge receipt of the event
+            return { code: 0 }
         })
         app.post('/pay/callback/stripe', { config: { rawBody: true } }, async (req, res) => {
             const { stripe } = this.gl
