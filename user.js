@@ -196,7 +196,7 @@ export class User extends BaseService {
                 return { code: 100, msg: "unknown event" }
             }
         }
-        if (this.customerId !== object.customer) {
+        if (this.customerId !== object.customer && (meta.status === 'trialing' || meta.status === 'active' || meta.status === 'paid')) {
             this.customerId = object.customer
             console.log("got customerId:", this.customerId)
             meta.uid = +meta.uid
