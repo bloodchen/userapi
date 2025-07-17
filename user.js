@@ -148,6 +148,7 @@ export class User extends BaseService {
     async stripe_handleEvent(event, object) {
         const { config, util } = this.gl
         let meta = {}
+        let sendSuccessNotify = false
         switch (event) {
             case 'customer.subscription.created':
             case 'customer.subscription.updated': {
@@ -169,7 +170,28 @@ export class User extends BaseService {
                 meta.status = subscription.status
                 meta.endTime = subscription.current_period_end;
                 meta.sub_id = subscription.id
-
+                if (meta.status === 'trialing') {
+                    sendSuccessNotify = true
+                }
+                break;
+            }
+            case 'invoice.payment_succeeded': {
+                meta = object.subscription_details?.metadata || object.metadata;
+                if (!meta) {
+                    console.error('no metadata')
+                    return { code: 100, msg: "no metadata" }
+                }
+                const { product } = meta
+                if (!config.payment[product]) {
+                    console.error('unknown product')
+                    return { code: 100, msg: "unknown product" }
+                }
+                meta.mode = 'sub'
+                meta.status = 'paid'
+                meta.amount = object.amount_paid;
+                meta.sub_id = object.subscription;
+                meta.endTime = object.period_end;
+                sendSuccessNotify = true;
                 break;
             }
             case 'payment_intent.succeeded': { //part of subsciption
@@ -189,6 +211,7 @@ export class User extends BaseService {
                 meta.mode = 'pay'
                 meta.status = 'paid'
                 meta.amount = object.amount_received;
+                sendSuccessNotify = true;
                 break;
             };
             default: {
@@ -196,7 +219,7 @@ export class User extends BaseService {
                 return { code: 100, msg: "unknown event" }
             }
         }
-        if (this.customerId !== object.customer && (meta.status === 'trialing' || meta.status === 'active' || meta.status === 'paid')) {
+        if (this.customerId !== object.customer && sendSuccessNotify) {
             this.customerId = object.customer
             console.log("got customerId:", this.customerId)
             meta.uid = +meta.uid
@@ -205,7 +228,7 @@ export class User extends BaseService {
             console.log("got metadata:", meta)
             await this.updateUser({ uid: meta.uid, info: { pay: meta } })
             this.notifyApp({ event: "order_paid", para: { meta } })
-            util.sendMail({ subject: meta.app + " order updated", text: JSON.stringify({ event, meta }) })
+            util.sendMail({ subject: meta.app + " order paid", text: JSON.stringify({ event, meta }) })
         }
         return { code: 0, msg: "done" }
     }
