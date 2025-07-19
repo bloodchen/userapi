@@ -372,7 +372,7 @@ export class User extends BaseService {
                 });
                 res.redirect(session.url); // 重定向到 Customer Portal
             } catch (error) {
-                res.status(500).send('Unable to load subscription management page');
+                res.status(500).send('Unable to load subscription management page, ' + error.message);
             }
         })
         app.post('/pay/callback/stripe_test', { config: { rawBody: true } }, async (req, res) => {
