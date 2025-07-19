@@ -366,7 +366,7 @@ export class User extends BaseService {
             if (!customerId) return { code: 100, msg: ERR.NO_CUSTOMER_ID }
             console.log("got customerId:", customerId)
             try {
-                const session = await gl.stripe.billingPortal.sessions.create({
+                const session = await this.gl.stripe.billingPortal.sessions.create({
                     customer: customerId,
                     return_url: 'https://your-website.com/dashboard',
                 });
