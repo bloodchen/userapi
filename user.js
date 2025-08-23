@@ -119,7 +119,7 @@ export class User extends BaseService {
         }
         if (lang === 'zh' && price_zh) price = price_zh
         if (lang === 'zh' && coupon_zh) coupon = coupon_zh
-        const metadata = { app, uid, product, v: 1, mode }
+        const metadata = { app, uid, product, v: 1, mode, cbName: 'userAPI' }
         const opts = {
             line_items: [{
                 price,
@@ -149,6 +149,14 @@ export class User extends BaseService {
         const { config, util } = this.gl
         let meta = {}
         let sendSuccessNotify = false
+        const isForMe = (meta) => {
+            const { cbName } = meta
+            if (!cbName || cbName !== 'userAPI') {
+                console.error('not for userAPI, cbName:', cbName)
+                return false
+            }
+            return true
+        }
         switch (event) {
             case 'customer.subscription.created':
             case 'customer.subscription.updated': {
@@ -161,6 +169,7 @@ export class User extends BaseService {
                     console.error('no metadata')
                     return { code: 100, msg: "no metadata" }
                 }
+                if (!isForMe(meta)) return { err: "not-for-me" }
                 const { product } = meta
                 if (!config.payment[product]) {
                     console.error('unknown product')
@@ -176,11 +185,12 @@ export class User extends BaseService {
                 break;
             }
             case 'invoice.payment_succeeded': {
-                meta = object.subscription_details?.metadata || object.metadata;
+                meta = object.parent.subscription_details?.metadata || object.metadata;
                 if (!meta) {
                     console.error('no metadata')
                     return { code: 100, msg: "no metadata" }
                 }
+                if (!isForMe(meta)) return { err: "not-for-me" }
                 const { product } = meta
                 if (!config.payment[product]) {
                     console.error('unknown product')
@@ -203,6 +213,8 @@ export class User extends BaseService {
                     console.error('no metadata')
                     return { code: 100, msg: "no metadata" }
                 }
+                if (!isForMe(meta)) return { err: "not-for-me" }
+
                 const { product } = meta
                 if (!config.payment[product]) {
                     console.error('unknown product')
