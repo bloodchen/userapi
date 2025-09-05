@@ -231,7 +231,7 @@ export class User extends BaseService {
                 return { code: 100, msg: "unknown event" }
             }
         }
-        if (this.customerId !== object.customer && sendSuccessNotify) {
+        if (sendSuccessNotify) {
             this.customerId = object.customer
             console.log("got customerId:", this.customerId)
             meta.uid = +meta.uid
