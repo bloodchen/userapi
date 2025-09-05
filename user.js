@@ -145,7 +145,7 @@ export class User extends BaseService {
         return { code: 0, url: session.url }
 
     }
-    async stripe_handleEvent(event, object) {
+    async stripe_handleEvent(event, object, stripe_used) {
         const { config, util } = this.gl
         let meta = {}
         let sendSuccessNotify = false
@@ -196,11 +196,13 @@ export class User extends BaseService {
                     console.error('unknown product')
                     return { code: 100, msg: "unknown product" }
                 }
+                const subId = object.subscription || object.parent.subscription_details.subscription
+                const sub = await stripe_used.subscriptions.retrieve(subId)
                 meta.mode = 'sub'
                 meta.status = 'paid'
                 meta.amount = object.amount_paid;
                 meta.sub_id = object.subscription;
-                meta.endTime = object.period_end;
+                meta.endTime = sub ? sub?.current_period_end : object.period_end;
                 sendSuccessNotify = true;
                 break;
             }
@@ -423,7 +425,7 @@ export class User extends BaseService {
                 return;
             }
             console.log('stripe event:', event)
-            this.stripe_handleEvent(event.type, event.data.object)
+            this.stripe_handleEvent(event.type, event.data.object, stripe)
 
             // Return a 200 response to acknowledge receipt of the event
             return { code: 0 }
