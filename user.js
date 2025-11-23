@@ -50,6 +50,7 @@ export class User extends BaseService {
         const { util } = this.gl
         const docCol = this.db.collection('users');
         if (!uid) uid = Math.floor(Date.now() / 1000)
+        uid = +uid
         let i = 0
         if (email) {
             const u = await this.getUser({ email })
@@ -388,6 +389,23 @@ export class User extends BaseService {
             } catch (error) {
                 res.status(500).send('Unable to load subscription management page, ' + error.message);
             }
+        })
+        app.get('/pay/cancelSubscription', async (req, res) => {
+            const { mail } = this.gl
+            const query = req.query;
+            const { name, app = 'pushray' } = query; // 从用户会话中获取 Stripe Subscription ID
+            const uid = await this.getUID({ req })
+            if (!uid) {
+                return { err: 'user-not-login' };
+            }
+            const user = await this.getUser({ uid });
+            if (!user.pay || !user.pay.sub_id) {
+                return { err: 'no-subscription' };
+            }
+            const sub_id = user.pay?.sub_id
+            let ret = await this.gl.stripe.subscriptions.cancel(sub_id);
+            //mail.send({ app, to: 'bloodchen@gmail.com', subject: account + "_" + name + ":subscription cancelled", text: JSON.stringify({ app, account, name, sub_id }) })
+            return { msg: "done", sub_id, ret }
         })
         app.post('/pay/callback/stripe_test', { config: { rawBody: true } }, async (req, res) => {
             const { stripe_test } = this.gl
